@@ -1,0 +1,27 @@
+#!/usr/bin/env bpftrace
+
+BEGIN
+{
+	printf("uid, gid, filename\n");
+}
+
+// 1. Decide which kprobe/syscall/tracepoint we want to bind to;
+// 2. Optionally filter events early based on some condition;
+// 3. Handle the event, only printing instances where the file open
+//    if created by the current user (uid:guid == 1000:1000).
+kprobe:generic_file_open
+/arg3 != 0/
+{
+	$inode_ptr = ((struct inode *) arg0);
+
+	$file_ptr = ((struct file *) arg1);
+	$dentry_ptr = $file_ptr->f_path.dentry;
+
+	if ($inode_ptr->i_uid.val == 1000) {
+		printf("%d, %d, %s\n", 
+			$inode_ptr->i_uid.val, 
+			$inode_ptr->i_gid.val, 
+		  str($file_ptr->f_path.dentry->d_name.name)	
+  	);
+	}
+}
